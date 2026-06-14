@@ -1,7 +1,7 @@
 import socket
 import threading
 
-def server_listener(data_socket, data_port  ):
+def server_listener(data_socket, data_port):
     while True:
         try:
             server_message = data_socket.recv(1024)
@@ -84,4 +84,11 @@ if __name__ == "__main__":
                 except Exception as e:
                     print(e)
                     break
-
+            case "who":
+                pass
+            case "broadcast":
+                pass
+            case "private":
+                pass
+            case "quit":
+                pass
