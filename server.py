@@ -1,4 +1,3 @@
-import random
 import socket
 import sys
 import threading
@@ -13,9 +12,9 @@ PORT = int(sys.argv[1])
 active_connections = {}
 
 # TODO: Client->Server->Client communication functions
-def send_private_message(username, message):
+def send_private_message(source_user, destination_user, message):
     pass
-def broadcast_message_to_all(message):
+def broadcast_message_to_all(source_user, message):
     pass
 
 def handle_client_session(control_socket, client_address):
@@ -28,7 +27,7 @@ def handle_client_session(control_socket, client_address):
     data_listener.listen(1) # Ensure port is bound before sending to client
 
     data_port = data_listener.getsockname()[1]
-    connection_response = f"200\n{data_port}"
+    connection_response = f"200\n\n{data_port}"
     print("Connection requested. Creating data socket")
     control_socket.sendall(connection_response.encode())
 
