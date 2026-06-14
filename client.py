@@ -51,7 +51,7 @@ if __name__ == "__main__":
                     status_code = response_lines[0]
 
                     if status_code == "200" and len(response_lines) > 1:
-                        data_port = int(response_lines[1])
+                        data_port = int(response_lines[2])
                         print(f"200 status coded received. Starting data connection on port {data_port}")
 
                         data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -84,7 +84,22 @@ if __name__ == "__main__":
                     print(e)
                     break
             case "who":
-                pass
+                try:
+                    control_socket.sendall(user_input.encode())
+
+                    response = data_socket.recv(1024).decode()
+                    response_lines = response.split('\n')
+                    status_code = response_lines[0]
+
+                    if status_code == "200" and len(response_lines) > 1:
+                        users = response_lines[1:]
+                        print("Active users:")
+                        for user in users:
+                            print(user)
+                    else:
+                        print("Failed to retrieve active users")
+                except Exception as e:
+                    print(e)
             case "broadcast":
                 pass
             case "private":

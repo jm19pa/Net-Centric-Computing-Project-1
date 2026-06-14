@@ -68,7 +68,10 @@ def handle_client_session(control_socket, client_address):
 
                         data_socket.sendall(login_response.encode())                
                     case "who":
-                        pass
+                        users = "\n".join(active_connections.keys())
+
+                        response = f"200\n{users}"
+                        data_socket.sendall(response.encode())
                     case "broadcast":
                         pass
                     case "private":
