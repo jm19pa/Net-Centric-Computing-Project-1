@@ -10,16 +10,45 @@ PORT = int(sys.argv[1])
 
 # TODO: Active connections dictionary must be thread safe
 active_connections = {}
+active_connections_lock = threading.Lock()
 
 # TODO: Client->Server->Client communication functions
 def send_private_message(source_user, destination_user, message):
-    pass
+    with active_connections_lock:
+        dest_socket = active_connections.get(destination_user)
+
+    if dest_socket is None:
+        return False
+
+    outgoing = f"200\nPrivate\n{source_user}\n{message}".encode()
+    try:
+        dest_socket.sendall(outgoing)
+        return True
+    except Exception:
+        return False
+
+
 def broadcast_message_to_all(source_user, message):
-    pass
+    outgoing = f"200\nBroadcast\n{source_user}\n{message}".encode()
+    with active_connections_lock:
+        sockets = list(active_connections.values())
+
+    for sock in sockets:
+        try:
+            sock.sendall(outgoing)
+        except Exception:
+            pass
+
+
+def remove_connection(username):
+    with active_connections_lock:
+        active_connections.pop(username, None)
+
 
 def handle_client_session(control_socket, client_address):
     thread_id = threading.get_ident()
     data_socket = None
+    username = None
 
     # Create a temporary listener to establish data socket
     data_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -61,25 +90,47 @@ def handle_client_session(control_socket, client_address):
                         print(f"Login requestd by: {username}")
 
                         login_response = "200"
-                        if username not in active_connections.keys():
-                            active_connections[username] = (data_socket)
-                        else:
-                            login_response = "500"
+                        with active_connections_lock:
+                            if username not in active_connections:
+                                active_connections[username] = data_socket
+                            else:
+                                login_response = "500"
 
                         data_socket.sendall(login_response.encode())                
                     case "who":
-                        users = "\n".join(active_connections.keys())
+                        with active_connections_lock:
+                            users = "\n".join(active_connections.keys())
 
                         response = f"200\n{users}"
                         data_socket.sendall(response.encode())
                     case "broadcast":
-                        pass
+                        message = " ".join(parts[1:]).strip()
+                        if not message:
+                            data_socket.sendall("500\nMissing message".encode())
+                            continue
+
+                        broadcast_message_to_all(username or "UNKNOWN", message)
+                        # data_socket.sendall("200".encode())
                     case "private":
-                        pass
+                        if len(parts) < 3:
+                            data_socket.sendall("500\nUsage: private <username> <message>".encode())
+                            continue
+
+                        destination_user = parts[1]
+                        message = " ".join(parts[2:]).strip()
+                        if send_private_message(username or "SERVER", destination_user, message):
+                            data_socket.sendall("200".encode())
+                        else:
+                            data_socket.sendall("500\nUser not found or send failed".encode())
                     case "quit":
-                        pass
+                        if username:
+                            remove_connection(username)
+                        data_socket.sendall("200".encode())
+                        break
 
             except ConnectionResetError:
+                if username:
+                    remove_connection(username)
                 pass
 
 def start_server():

@@ -9,7 +9,8 @@ def server_listener(data_socket, data_port):
                 # Server closed data channel
                 break
 
-            print(server_message.decode())
+            message = server_message.decode()
+            print(message)
         except Exception as e:
             print(e)
             
@@ -101,8 +102,23 @@ if __name__ == "__main__":
                 except Exception as e:
                     print(e)
             case "broadcast":
-                pass
+                if len(parts) < 2:
+                    print("Usage: broadcast <message>")
+                    continue
+
+                try:
+                    control_socket.sendall(user_input.encode())
+                except Exception as e:
+                    print(e)
             case "private":
-                pass
+                if len(parts) < 3:
+                    print("Usage: private <username> <message>")
+                    continue
+
+                try:
+                    control_socket.sendall(user_input.encode())
+                except Exception as e:
+                    print(e)
             case "quit":
+
                 pass
