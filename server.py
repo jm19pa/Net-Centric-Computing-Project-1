@@ -15,7 +15,6 @@ active_connections = {}
 # TODO: Client->Server->Client communication functions
 def send_private_message(username, message):
     pass
-
 def broadcast_message_to_all(message):
     pass
 
@@ -23,7 +22,7 @@ def handle_client_session(control_socket, client_address):
     thread_id = threading.get_ident()
     data_socket = None
 
-    # Create a temporary listener to create to establish data socket
+    # Create a temporary listener to establish data socket
     data_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     data_listener.bind(('0.0.0.0', 0)) # Let the OS decide the port number
     data_listener.listen(1) # Ensure port is bound before sending to client
@@ -99,7 +98,7 @@ def start_server():
             # Create a data socket in its own thread for each server->client commumnication
             client_thread = threading.Thread(
                 target=handle_client_session,
-                args=(control_socket, 0, client_address)  # Setting data port to 0 allows the OS to automatically pick an open port
+                args=(control_socket, client_address)
             )
             client_thread.daemon = True
             client_thread.start()

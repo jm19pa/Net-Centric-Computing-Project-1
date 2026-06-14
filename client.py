@@ -11,7 +11,7 @@ def server_listener(data_socket, data_port):
 
             print(server_message.decode())
         except Exception as e:
-            break
+            print(e)
             
 
 if __name__ == "__main__":
@@ -58,13 +58,13 @@ if __name__ == "__main__":
                         data_socket.connect((server_ip, data_port))
                 except Exception as e:
                     print(e)
-                    control_socket = None
             case "login":
                 if len(parts) < 2:
                     print("Usage: login <username>")
                     continue
 
                 try:
+                    # Send command to server for processing
                     control_socket.sendall(user_input.encode())
 
                     response = data_socket.recv(1024).decode()
@@ -78,7 +78,6 @@ if __name__ == "__main__":
                         target=server_listener,
                         args=(data_socket, data_port)
                     )
-
                     listening_thread.daemon = True
                     listening_thread.start()
                 except Exception as e:
