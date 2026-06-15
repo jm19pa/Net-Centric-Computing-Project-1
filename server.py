@@ -20,7 +20,7 @@ def send_private_message(source_user, destination_user, message):
     if dest_socket is None:
         return False
 
-    outgoing = f"200\nPrivate\n{source_user}\n{message}".encode()
+    outgoing = f"200\n\nPrivate\n{source_user}\n{message}".encode()
     try:
         dest_socket.sendall(outgoing)
         return True
@@ -29,7 +29,7 @@ def send_private_message(source_user, destination_user, message):
 
 
 def broadcast_message_to_all(source_user, message):
-    outgoing = f"200\nBroadcast\n{source_user}\n{message}".encode()
+    outgoing = f"200\n\nBroadcast\n{source_user}\n{message}".encode()
     with active_connections_lock:
         sockets = list(active_connections.values())
 
@@ -98,36 +98,41 @@ def handle_client_session(control_socket, client_address):
 
                         data_socket.sendall(login_response.encode())                
                     case "who":
+                        print("Who requested. Sending users.")
                         with active_connections_lock:
-                            users = "\n".join(active_connections.keys())
+                            users = ", ".join(active_connections.keys())
 
-                        response = f"200\n{users}"
+                        response = f"200\n\n{users}"
                         data_socket.sendall(response.encode())
                     case "broadcast":
                         message = " ".join(parts[1:]).strip()
+                        print(f"Broadcast requested by {username}\nMessage: {message}")
+
                         if not message:
-                            data_socket.sendall("500\nMissing message".encode())
+                            data_socket.sendall("500".encode())
                             continue
 
-                        broadcast_message_to_all(username or "UNKNOWN", message)
-                        # data_socket.sendall("200".encode())
+                        data_socket.sendall("200".encode())
+                        broadcast_message_to_all(username or "UNKNOWN", message) 
                     case "private":
                         if len(parts) < 3:
                             data_socket.sendall("500\nUsage: private <username> <message>".encode())
                             continue
 
                         destination_user = parts[1]
+                        print(f"Private message from {username} to {destination_user}")
+                        
                         message = " ".join(parts[2:]).strip()
                         if send_private_message(username or "SERVER", destination_user, message):
                             data_socket.sendall("200".encode())
                         else:
-                            data_socket.sendall("500\nUser not found or send failed".encode())
+                            data_socket.sendall("500".encode())
                     case "quit":
                         if username:
                             remove_connection(username)
                         data_socket.sendall("200".encode())
-                        break
-
+                        data_socket.close()
+                        return
             except ConnectionResetError:
                 if username:
                     remove_connection(username)
