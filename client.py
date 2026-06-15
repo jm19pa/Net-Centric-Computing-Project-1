@@ -140,6 +140,7 @@ if __name__ == "__main__":
                         listening_thread.start()
                 except Exception as e:
                     print(e)
+                    continue
             case "login":
                 if len(parts) < 2:
                     print("Usage: login <username>")
@@ -153,6 +154,7 @@ if __name__ == "__main__":
                     control_socket.sendall(user_input.encode())
                 except Exception as e:
                     print(e)
+                    continue
             case "who":
                 with lock:
                     last_response = None
@@ -163,6 +165,7 @@ if __name__ == "__main__":
                     
                 except Exception as e:
                     print(e)
+                    continue
             case "broadcast":
                 if len(parts) < 2:
                     print("Usage: broadcast <message>")
@@ -176,6 +179,7 @@ if __name__ == "__main__":
                     control_socket.sendall(user_input.encode())
                 except Exception as e:
                     print(e)
+                    continue
             case "private":
                 if len(parts) < 3:
                     print("Usage: private <username> <message>")
@@ -188,6 +192,7 @@ if __name__ == "__main__":
                     control_socket.sendall(user_input.encode())
                 except Exception as e:
                     print(e)
+                    continue
             case "quit":
                 with lock:
                     last_response = None
@@ -197,6 +202,7 @@ if __name__ == "__main__":
                     control_socket.sendall(user_input.encode())
                 except Exception as e:
                     print(e)
+                    continue
             
 
         # Wait for server command response before continuing
