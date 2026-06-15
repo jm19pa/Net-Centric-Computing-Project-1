@@ -25,8 +25,8 @@ def data_listener(data_socket, data_port):
                     private_message = " ".join(parts[4:])
                     print(f"\n{parts[3]}: {private_message}", end="\n> ")
 
-            # Otherwise for command response
-            elif len(parts) == 4 and parts[3] != username:
+            # Otherwise for command response or join/quit notifications
+            elif len(parts) == 4 and parts[2] in ("join", "quit") and parts[3] != username:
                 if parts[2] == "join":
                     print(f"\n{parts[3]} has logged in.", end="\n> ")
                 else:
@@ -57,7 +57,10 @@ def print_response():
                 print("500 status code received. Failed to login.")
         elif last_command == "who":
             if status_code == "200":
-                users = parts[2]
+                if len(parts) >= 4 and parts[2] == "who":
+                    users = parts[3]
+                else:
+                    users = parts[2] if len(parts) > 2 else ""
                 print(f"200 status code received. Users currently connected: {users}")
             else:
                 print(f"500 status code received. Failed to retrieve active users.")
@@ -121,9 +124,6 @@ if __name__ == "__main__":
                     response_lines = response.split('\n')
                     status_code = response_lines[0]
 
-                    # Force event to prevent yielding
-                    response_ready.set()
-
                     if status_code == "200" and len(response_lines) > 1:
                         data_port = int(response_lines[2])
                         print(f"200 status coded received. Starting data connection on port {data_port}")
@@ -145,6 +145,8 @@ if __name__ == "__main__":
                     print("Usage: login <username>")
                     continue
                 with lock:
+                    last_response = None
+                    response_ready.clear()
                     last_command = "login"
                     username = parts[1]
                 try:
@@ -152,16 +154,23 @@ if __name__ == "__main__":
                 except Exception as e:
                     print(e)
             case "who":
-                last_command = "who"  
+                with lock:
+                    last_response = None
+                    response_ready.clear()
+                    last_command = "who"
                 try:
                     control_socket.sendall(user_input.encode())
+                    
                 except Exception as e:
                     print(e)
             case "broadcast":
                 if len(parts) < 2:
                     print("Usage: broadcast <message>")
                     continue
-                last_command = "broadcast"
+                with lock:
+                    last_response = None
+                    response_ready.clear()
+                    last_command = "broadcast"
 
                 try:
                     control_socket.sendall(user_input.encode())
@@ -171,13 +180,19 @@ if __name__ == "__main__":
                 if len(parts) < 3:
                     print("Usage: private <username> <message>")
                     continue
-                last_command = "private"
+                with lock:
+                    last_response = None
+                    response_ready.clear()
+                    last_command = "private"
                 try:
                     control_socket.sendall(user_input.encode())
                 except Exception as e:
                     print(e)
             case "quit":
-                last_command = "quit"
+                with lock:
+                    last_response = None
+                    response_ready.clear()
+                    last_command = "quit"
                 try:
                     control_socket.sendall(user_input.encode())
                 except Exception as e:

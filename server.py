@@ -121,7 +121,7 @@ def handle_client_session(control_socket, client_address):
                         with active_connections_lock:
                             users = ", ".join(active_connections.keys())
 
-                        response = f"200\n\n{users}"
+                        response = f"200\n\nwho\n{users}"
                         data_socket.sendall(response.encode())
                     case "broadcast":
                         message = " ".join(parts[1:]).strip()
