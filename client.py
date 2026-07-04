@@ -1,3 +1,4 @@
+import os
 import socket
 import threading
 
@@ -7,6 +8,8 @@ lock = threading.Lock()
 last_command = None
 last_response = None
 username = None
+
+requested_file = None
 
 def data_listener(data_socket, data_port):
     while True:
@@ -50,36 +53,51 @@ def print_response():
         parts = last_response.split('\n')
         status_code = parts[0]
         
-        if last_command == "login":
-            if status_code == "200":
-                print("200 status code received. Login successful.")
-            else:
-                print("500 status code received. Failed to login.")
-        elif last_command == "who":
-            if status_code == "200":
-                if len(parts) >= 4 and parts[2] == "who":
-                    users = parts[3]
+        match last_command:
+            case "login":
+                if status_code == "200":
+                    print("200 status code received. Login successful.")
                 else:
-                    users = parts[2] if len(parts) > 2 else ""
-                print(f"200 status code received. Users currently connected: {users}")
-            else:
-                print(f"500 status code received. Failed to retrieve active users.")
-        elif last_command == "broadcast":
-            if status_code == "200":
-                print("200 status code received.")
-            else:
-                print("500 status code received. Failed to broadcast.")
-        elif last_command == "private":
-            if status_code == "200":
-                print("200 status code received. Message sent.")
-            else:
-                print("500 status code received. Message failed to send.")
-        elif last_command == "quit":
-            if status_code == "200":
-                print("200 status code received.")
-            else:
-                print("500 status code received. Failed to disconnect")
+                    print("500 status code received. Failed to login.")
+            case "who":
+                if status_code == "200":
+                    if len(parts) >= 4 and parts[2] == "who":
+                        users = parts[3]
+                    else:
+                        users = parts[2] if len(parts) > 2 else ""
+                    print(f"200 status code received. Users currently connected: {users}")
+                else:
+                    print(f"500 status code received. Failed to retrieve active users.")
+            case "broadcast":
+                if status_code == "200":
+                    print("200 status code received.")
+                else:
+                    print("500 status code received. Failed to broadcast.")
+            case "private":
+                if status_code == "200":
+                    print("200 status code received. Message sent.")
+                else:
+                    print("500 status code received. Message failed to send.")
+            case "quit":
+                if status_code == "200":
+                    print("200 status code received.")
+                else:
+                    print("500 status code received. Failed to disconnect")
+            case "stor":
+                pass
+            case "retr":
+                if status_code == "200":
+                    with open(requested_file, 'wb') as file:
+                        while True:
+                            data = data_socket.recv(1024)
+                            if data.decode() == "EOF\n":
+                                break
+                            file.write(data)
 
+                    print("File retrieved.")
+                else:
+                    print("500 status code received")
+        
         last_response = None
 
 
@@ -104,7 +122,7 @@ if __name__ == "__main__":
         parts = user_input.split()
         command = parts[0].lower()
 
-        if command not in ["connect", "login", "who", "broadcast", "private", "quit"]:
+        if command not in ["connect", "login", "who", "broadcast", "private", "quit", "retr"]:
             print("Invalid command.")
             continue
 
@@ -203,7 +221,28 @@ if __name__ == "__main__":
                 except Exception as e:
                     print(e)
                     continue
-            
+            case "stor":
+                pass
+            case "retr":
+                if len(parts) < 2:
+                    print("Usage: retr <file_name>")
+                    continue
+
+                try:
+                    control_socket.sendall(user_input.encode())
+                except Exception as e:
+                    print(e)
+                    continue
+
+                requested_file = parts[1]
+                with lock:
+                    last_response = None
+                    response_ready.clear()
+                    last_command = "retr"
+            case "list":
+                pass
+            case "dele":
+                pass
 
         # Wait for server command response before continuing
         if command != "connect":

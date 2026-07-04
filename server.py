@@ -1,3 +1,4 @@
+import os
 import socket
 import sys
 import threading
@@ -37,6 +38,7 @@ def broadcast_message_to_all(source_user, message):
         except Exception:
             pass
 
+
 def broadcast_user_join(joined_user):
     outgoing = f"200\n\njoin\n{joined_user}".encode()
     with active_connections_lock:
@@ -45,6 +47,7 @@ def broadcast_user_join(joined_user):
                 continue
             else:
                 active_connections[username].sendall(outgoing)
+
 
 def broadcast_user_disconnect(exited_user):
     outgoing = f"200\n\nquit\n{exited_user}".encode()
@@ -63,6 +66,19 @@ def remove_connection(username):
         active_connections.pop(username, None)
 
 
+def transfer_file_to_user(file_name, destination_user):
+    with active_connections_lock:
+        dest_socket = active_connections.get(destination_user)
+    
+    try:
+        dest_socket.sendall("START_OF_FILE\n".encode())
+        with open(f"serverdirectory/{file_name}", 'rb') as file:
+            for data_chunk in file:
+                dest_socket.sendall(data_chunk)
+            dest_socket.sendall("EOF\n".encode())
+    except:
+        return
+
 def handle_client_session(control_socket, client_address):
     thread_id = threading.get_ident()
     data_socket = None
@@ -70,7 +86,7 @@ def handle_client_session(control_socket, client_address):
 
     # Create a temporary listener to establish data socket
     data_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    data_listener.bind(('0.0.0.0', 0)) # Let the OS decide the port number
+    data_listener.bind(('10.0.0.140', 0)) # Let the OS decide the port number
     data_listener.listen(1) # Ensure port is bound before sending to client
 
     data_port = data_listener.getsockname()[1]
@@ -153,6 +169,22 @@ def handle_client_session(control_socket, client_address):
                         data_socket.close()
                         broadcast_user_disconnect(username)
                         return
+                    case "stor":
+                        pass
+                    case "retr":
+                        file_request = parts[1]
+                        print(f"Retr requested by {username}. Sending file: {file_request}")
+
+                        if os.path.isfile(f"serverdirectory/{file_request}"):
+                            data_socket.sendall("200\n".encode())
+                            transfer_file_to_user(file_request, username)
+                            print("File sent.\n")
+                        else:
+                            data_socket.sendall("500\n".encode())
+                    case "list":
+                        pass
+                    case "dele":
+                        pass
             except ConnectionResetError:
                 if username:
                     remove_connection(username)
