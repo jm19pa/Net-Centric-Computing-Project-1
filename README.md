@@ -1,5 +1,5 @@
 # Net-Centric-Computing-Project-1
-https://youtu.be/LQVY1sUdCIc
+
 link for video^
 Juan Pinero 6353764
 Bishal Ghosh 6404406

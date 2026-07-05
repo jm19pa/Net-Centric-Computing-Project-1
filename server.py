@@ -86,7 +86,7 @@ def handle_client_session(control_socket, client_address):
 
     # Create a temporary listener to establish data socket
     data_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    data_listener.bind(('10.0.0.140', 0)) # Let the OS decide the port number
+    data_listener.bind(('0.0.0.0', 0)) # Let the OS decide the port number and accept connections from any interface
     data_listener.listen(1) # Ensure port is bound before sending to client
 
     data_port = data_listener.getsockname()[1]
@@ -166,11 +166,39 @@ def handle_client_session(control_socket, client_address):
                         if username:
                             remove_connection(username)
                         data_socket.sendall("200".encode())
+                        print(f"Quit requested by {username}")
                         data_socket.close()
                         broadcast_user_disconnect(username)
                         return
                     case "stor":
-                        pass
+                        if len(parts) < 2:
+                            data_socket.sendall("500".encode())
+                            continue
+
+                        file_name = parts[1]
+                        print(f"Stor {file_name} requested by {username}\n STOR complete")
+
+                        try:
+                            os.makedirs('serverdirectory', exist_ok=True)
+                            with open(f"serverdirectory/{file_name}", 'wb') as f:
+                                while True:
+                                    chunk = data_socket.recv(1024)
+                                    if not chunk:
+                                        break
+                                    try:
+                                        if chunk.decode() == "EOF\n":
+                                            break
+                                    except Exception:
+                                        pass
+                                    f.write(chunk)
+
+                            data_socket.sendall("200".encode())
+                        except Exception as e:
+                            print(e)
+                            try:
+                                data_socket.sendall("500".encode())
+                            except Exception:
+                                pass
                     case "retr":
                         file_request = parts[1]
                         print(f"Retr requested by {username}. Sending file: {file_request}")
@@ -182,9 +210,42 @@ def handle_client_session(control_socket, client_address):
                         else:
                             data_socket.sendall("500\n".encode())
                     case "list":
-                        pass
+                        # Send a comma separated list of files in serverdirectory
+                        try:
+                            files = []
+                            print(f"List requested by {username}. Sending files.")
+                            if os.path.isdir('serverdirectory'):
+                                files = [f for f in os.listdir('serverdirectory') if os.path.isfile(os.path.join('serverdirectory', f))]
+                            file_list = ",".join(files)
+                            response = f"200\n\nlist\n{file_list}"
+                            data_socket.sendall(response.encode())
+                        except Exception as e:
+                            print(e)
+                            try:
+                                data_socket.sendall("500".encode())
+                            except Exception:
+                                pass
                     case "dele":
-                        pass
+                        if len(parts) < 2:
+                            data_socket.sendall("500".encode())
+                            continue
+
+                        file_name = parts[1]
+                        file_path = f"serverdirectory/{file_name}"
+                        print(f"Dele requested by {username}. Sending file: {file_name}")
+                        try:
+                            if os.path.isfile(file_path):
+                                os.remove(file_path)
+                                data_socket.sendall("200".encode())
+                                print(f"Delete complete")
+                            else:
+                                data_socket.sendall("500".encode())
+                        except Exception as e:
+                            print(e)
+                            try:
+                                data_socket.sendall("500".encode())
+                            except Exception:
+                                pass
             except ConnectionResetError:
                 if username:
                     remove_connection(username)

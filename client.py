@@ -10,6 +10,7 @@ last_response = None
 username = None
 
 requested_file = None
+data_socket = None
 
 def data_listener(data_socket, data_port):
     while True:
@@ -84,20 +85,41 @@ def print_response():
                 else:
                     print("500 status code received. Failed to disconnect")
             case "stor":
-                pass
+                if status_code == "200":
+                    print("200 status code received. File Sent.")
+                else:
+                    print("500 status code received. Failed to store file.")
             case "retr":
                 if status_code == "200":
+                    global data_socket
                     with open(requested_file, 'wb') as file:
                         while True:
                             data = data_socket.recv(1024)
-                            if data.decode() == "EOF\n":
-                                break
+                            try:
+                                if data.decode() == "EOF\n":
+                                    break
+                            except Exception:
+                                pass
                             file.write(data)
 
                     print("File retrieved.")
                 else:
                     print("500 status code received")
-        
+            case "list":
+                if status_code == "200":
+                    if len(parts) >= 4 and parts[2] == "list":
+                        file_list = parts[3].strip()
+                        if file_list:
+                            print(f"Files on server: {file_list}")
+                        else:
+                            print("No files on server.")
+                    else:
+                        # Fallback: print whatever payload exists
+                        payload = " ".join(parts[1:]).strip()
+                        print(f"200 status code received. Payload: {payload}")
+                else:
+                    print(f"{status_code} status code received")
+
         last_response = None
 
 
@@ -122,7 +144,7 @@ if __name__ == "__main__":
         parts = user_input.split()
         command = parts[0].lower()
 
-        if command not in ["connect", "login", "who", "broadcast", "private", "quit", "retr"]:
+        if command not in ["connect", "login", "who", "broadcast", "private", "quit", "retr", "stor", "list", "dele"]:
             print("Invalid command.")
             continue
 
@@ -222,7 +244,30 @@ if __name__ == "__main__":
                     print(e)
                     continue
             case "stor":
-                pass
+                if len(parts) < 2:
+                    print("Usage: stor <file_name>")
+                    continue
+
+                filename = parts[1]
+                if not os.path.isfile(filename):
+                    print("File does not exist locally.")
+                    continue
+
+                with lock:
+                    last_response = None
+                    response_ready.clear()
+                    last_command = "stor"
+
+                try:
+                    control_socket.sendall(user_input.encode())
+
+                    with open(filename, 'rb') as f:
+                        for chunk in f:
+                            data_socket.sendall(chunk)
+                    data_socket.sendall("EOF\n".encode())
+                except Exception as e:
+                    print(e)
+                    continue
             case "retr":
                 if len(parts) < 2:
                     print("Usage: retr <file_name>")
@@ -240,9 +285,29 @@ if __name__ == "__main__":
                     response_ready.clear()
                     last_command = "retr"
             case "list":
-                pass
+                with lock:
+                    last_response = None
+                    response_ready.clear()
+                    last_command = "list"
+                try:
+                    control_socket.sendall(user_input.encode())
+                except Exception as e:
+                    print(e)
+                    continue
             case "dele":
-                pass
+                if len(parts) < 2:
+                    print("Usage: dele <file_name>")
+                    continue
+
+                with lock:
+                    last_response = None
+                    response_ready.clear()
+                    last_command = "dele"
+                try:
+                    control_socket.sendall(user_input.encode())
+                except Exception as e:
+                    print(e)
+                    continue
 
         # Wait for server command response before continuing
         if command != "connect":
