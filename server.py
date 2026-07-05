@@ -71,11 +71,10 @@ def transfer_file_to_user(file_name, destination_user):
         dest_socket = active_connections.get(destination_user)
     
     try:
-        dest_socket.sendall("START_OF_FILE\n".encode())
         with open(f"serverdirectory/{file_name}", 'rb') as file:
             for data_chunk in file:
                 dest_socket.sendall(data_chunk)
-            dest_socket.sendall("EOF\n".encode())
+            dest_socket.sendall("200\n".encode())
     except:
         return
 
@@ -200,13 +199,15 @@ def handle_client_session(control_socket, client_address):
                             except Exception:
                                 pass
                     case "retr":
+                        if not username:
+                            data_socket.sendall("500\n".encode())
+
                         file_request = parts[1]
                         print(f"Retr requested by {username}. Sending file: {file_request}")
 
                         if os.path.isfile(f"serverdirectory/{file_request}"):
-                            data_socket.sendall("200\n".encode())
                             transfer_file_to_user(file_request, username)
-                            print("File sent.\n")
+                            print("File sent.")
                         else:
                             data_socket.sendall("500\n".encode())
                     case "list":

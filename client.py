@@ -13,11 +13,46 @@ requested_file = None
 data_socket = None
 
 def data_listener(data_socket, data_port):
+    global requested_file
+    
     while True:
         try:
-            server_message = data_socket.recv(1024).decode()
+            server_message = data_socket.recv(1024)
             if not server_message:
                 break
+
+            # File was requested, message contains file contents
+            if requested_file:
+                if server_message.startswith(b"500\n"):
+                    print("500 status code received.")
+                    requested_file = None
+                    response_ready.set()
+                    continue
+
+                with open(requested_file, 'wb') as file:
+                    if b"200\n" in server_message:
+                        marker_index = server_message.index(b"200\n")
+                        file.write(server_message[:marker_index])
+                        print("File retrieved.")
+                        response_ready.set()
+                        requested_file = None
+                        continue
+
+                    file.write(server_message)
+                    while True:
+                        data = data_socket.recv(1024)
+                        if b"200\n" in data:
+                            marker_index = data.index(b"200\n")
+                            file.write(data[:marker_index])
+                            print("File retrieved.")
+                            break
+                        file.write(data)
+
+                requested_file = None
+                response_ready.set()
+                continue 
+
+            server_message = server_message.decode()
             parts = server_message.split('\n')
 
             # Print messages from other users immediately
@@ -41,8 +76,9 @@ def data_listener(data_socket, data_port):
                     last_response = server_message
                     response_ready.set()
 
-        except:
-            break
+        except Exception as e:
+            print(e)
+            response_ready.set()
 
 def print_response():
     with lock:
@@ -85,41 +121,8 @@ def print_response():
                 else:
                     print("500 status code received. Failed to disconnect")
             case "stor":
-                if status_code == "200":
-                    print("200 status code received. File Sent.")
-                else:
-                    print("500 status code received. Failed to store file.")
-            case "retr":
-                if status_code == "200":
-                    global data_socket
-                    with open(requested_file, 'wb') as file:
-                        while True:
-                            data = data_socket.recv(1024)
-                            try:
-                                if data.decode() == "EOF\n":
-                                    break
-                            except Exception:
-                                pass
-                            file.write(data)
-
-                    print("File retrieved.")
-                else:
-                    print("500 status code received")
-            case "list":
-                if status_code == "200":
-                    if len(parts) >= 4 and parts[2] == "list":
-                        file_list = parts[3].strip()
-                        if file_list:
-                            print(f"Files on server: {file_list}")
-                        else:
-                            print("No files on server.")
-                    else:
-                        # Fallback: print whatever payload exists
-                        payload = " ".join(parts[1:]).strip()
-                        print(f"200 status code received. Payload: {payload}")
-                else:
-                    print(f"{status_code} status code received")
-
+                pass
+        
         last_response = None
 
 
