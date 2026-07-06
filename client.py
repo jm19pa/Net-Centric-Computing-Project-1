@@ -4,6 +4,7 @@ import threading
 
 response_ready = threading.Event()
 lock = threading.Lock()
+FILE_TRANSFER_MARKER = b"\n__EOF__\n"
 
 last_command = None
 last_response = None
@@ -21,7 +22,6 @@ def data_listener(data_socket, data_port):
             if not server_message:
                 break
 
-            # File was requested, message contains file contents
             if requested_file:
                 if server_message.startswith(b"500\n"):
                     print("500 status code received.")
@@ -29,25 +29,16 @@ def data_listener(data_socket, data_port):
                     response_ready.set()
                     continue
 
+                payload = server_message
+                if payload.endswith(FILE_TRANSFER_MARKER):
+                    payload = payload[:-len(FILE_TRANSFER_MARKER)]
+                elif FILE_TRANSFER_MARKER in payload:
+                    payload = payload.split(FILE_TRANSFER_MARKER, 1)[0]
+
                 with open(requested_file, 'wb') as file:
-                    if b"200\n" in server_message:
-                        marker_index = server_message.index(b"200\n")
-                        file.write(server_message[:marker_index])
-                        print("File retrieved.")
-                        response_ready.set()
-                        requested_file = None
-                        continue
+                    file.write(payload)
 
-                    file.write(server_message)
-                    while True:
-                        data = data_socket.recv(1024)
-                        if b"200\n" in data:
-                            marker_index = data.index(b"200\n")
-                            file.write(data[:marker_index])
-                            print("File retrieved.")
-                            break
-                        file.write(data)
-
+                print("File retrieved.")
                 requested_file = None
                 response_ready.set()
                 continue 
@@ -121,8 +112,29 @@ def print_response():
                 else:
                     print("500 status code received. Failed to disconnect")
             case "stor":
-                pass
-        
+                if status_code == "200":
+                    print("200 status code received. File sent.")
+                else:
+                    print("500 status code received. Failed to store file.")
+            case "retr":
+                if status_code == "200":
+                    print("File retrieved.")
+                else:
+                    print("500 status code received. Failed to retrieve file.")
+            case "list":
+                if status_code == "200":
+                    if len(parts) >= 4 and parts[2] == "list":
+                        files = parts[3]
+                    else:
+                        files = parts[2] if len(parts) > 2 else ""
+                    print(f"200 status code received. Files: {files}")
+                else:
+                    print("500 status code received. Failed to list files.")
+            case "dele":
+                if status_code == "200":
+                    print("200 status code received. File deleted.")
+                else:
+                    print("500 status code received. Failed to delete file.")
         last_response = None
 
 
@@ -265,9 +277,8 @@ if __name__ == "__main__":
                     control_socket.sendall(user_input.encode())
 
                     with open(filename, 'rb') as f:
-                        for chunk in f:
-                            data_socket.sendall(chunk)
-                    data_socket.sendall("EOF\n".encode())
+                        data = f.read()
+                    data_socket.sendall(data + FILE_TRANSFER_MARKER)
                 except Exception as e:
                     print(e)
                     continue
