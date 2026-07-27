@@ -1,0 +1,61 @@
+1. What is one major difference between the protocol in this project when
+   compared to the TLS protocol?
+
+TLS does more than encrypt application messages with a public key. During its
+handshake, TLS authenticates the server with a certificate, negotiates
+algorithms, normally performs an ephemeral key exchange, and derives symmetric
+session keys. It then protects numbered records with authenticated encryption.
+This project sends unauthenticated RSA public keys directly over the same
+connection and uses those RSA keys to protect each application message.
+
+2. What flaws can you identify in the "secure" protocol?
+
+The initial public-key exchange is not authenticated, so neither side can prove
+who owns a received key. A username is also only a unique nickname, not an
+authenticated identity. Direct RSA encryption is inefficient, has strict
+message-size limits, and provides no forward secrecy: disclosure of a long-term
+private key can expose traffic recorded for that key. The included unkeyed
+SHA-256 digest is not a digital signature or a message authentication code,
+because anyone who knows the public key can calculate a new digest and encrypt
+a new message. The protocol also has no sequence number, timestamp, or replay
+window, and it exposes connection metadata. Finally, the server decrypts every
+message, so it must be fully trusted and is a high-value target.
+
+3. How could the "secure" server and client framework above be compromised?
+
+An attacker positioned between a client and server could replace both public
+keys during the plaintext connect/login exchange. The attacker could then
+decrypt, read, alter, re-encrypt, and forward messages while both endpoints
+believe the connection is secure. A malicious client could claim another
+person's username before that person logs in. Captured messages could be
+replayed because there is no authenticated counter or freshness check. If the
+server or its private key is compromised, the attacker can read the messages
+the server receives and can impersonate the server. An attacker could also
+exhaust threads and sockets by opening many control connections and never
+finishing the data connection or login.
+
+4. How could you improve the framework?
+
+First, bind identities to keys. The server should present a certificate or a
+public-key fingerprint that clients obtained through an independent trusted
+channel. A client should prove possession of its private key by signing a fresh
+server challenge, and the server should bind that verified key to the user's
+account rather than trusting a typed nickname.
+
+Second, use RSA only to authenticate or wrap short key material. Each
+connection should perform an ephemeral Diffie-Hellman exchange, such as
+X25519, and derive separate send and receive keys with HKDF. Application
+records should use AES-GCM or ChaCha20-Poly1305. Each record should contain a
+protocol version, message type, length, sender/recipient identifiers, and a
+strictly increasing sequence number; the sequence number and header should be
+authenticated as associated data. Unique nonces plus sequence validation would
+detect alteration, duplication, and reordering while ephemeral keys would add
+forward secrecy.
+
+Third, private-chat content could be encrypted end to end with a recipient
+session key so the server routes ciphertext without reading the message body.
+The server should also enforce handshake timeouts, maximum frame and message
+sizes, per-address connection and command rate limits, safe error handling, and
+regular key rotation. These changes address authentication, integrity,
+freshness, confidentiality, availability, and key compromise separately
+instead of treating encryption alone as complete security.
