@@ -49,7 +49,7 @@ The project folder contains:
 | `README.md` | Short team and run instructions | Only if requested |
 | `PROJECT_GUIDE.md` | This development/demo guide | No |
 | `.gitignore` | Keeps temporary files out of Git | No |
-| `tests/integration_test.py` | Automated two-client verification | No |
+| `integration_test.py` | Automated two-client verification | No |
 
 Do not rename `server.py` or `client.py`. The assignment says the autograder
 looks for those exact names.
@@ -454,7 +454,7 @@ This confirms that the program does not hard-code port 8991.
 From the project root:
 
 ```powershell
-python tests/integration_test.py
+python integration_test.py
 ```
 
 The script starts the real `server.py` plus two real `client.py` processes. It
